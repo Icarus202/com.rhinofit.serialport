@@ -1,0 +1,30 @@
+{
+  "manifest_version": 2,
+  "name": "RhinoFit ComPort Communicator",
+  "description": "Send Open Command to turnstile or door",
+  "version": "1.1",
+  "icons": {
+    "16": "calculator-16.png",
+    "128": "calculator-128.png"
+  },
+  "app": {
+    "background": {
+        "scripts":  ["background.js"]
+    }
+  },
+  "permissions": [
+    "background",
+    "notifications",
+    "serial",
+    "usb",
+    {
+        "usbDevices": [
+            {
+                "vendorId": 5050,
+                "productId": 24
+            }
+        ]
+    },
+    "hid"
+  ]
+}
