@@ -1,5 +1,6 @@
 // JavaScript source code
 var port = null;
+var fixed_size = [600, 600];
 document.addEventListener("DOMContentLoaded", function () {
     var buttons = document.querySelectorAll('button');
     [].forEach.call(buttons, function (button) {
@@ -7,7 +8,10 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     port = chrome.runtime.connect({ name: "content-background" });
+
     //also disconnect listeners...
+
+
     port.onMessage.addListener(function (request, sender) {
         console.log(JSON.stringify(request));
         if (request['callback'] == "showDevices") {
@@ -31,11 +35,17 @@ document.addEventListener("DOMContentLoaded", function () {
         } else {
 
         }
-    })
+    });
+
+    window.resizeTo(fixed_size[0], fixed_size[1]);
+    $(window).resize(function () {
+        window.resizeTo(fixed_size[0], fixed_size[1]);
+    });
 });
 
 function clickHandler(e) {
-    if (e.target.innerHTML == "Test") {
+    console.log($(this));
+    if ($(this).attr("name") == "test") {
         port.postMessage({ type: "SCRIPTS", action: "testing_this" });
     } else if (e.target.innerHTML == "Connect") {
         var path = document.getElementsByName('showDevices')[0].value;
@@ -44,14 +54,29 @@ function clickHandler(e) {
         port.postMessage({ type: "SCRIPTS", action: "sendMessage", data: "whatever" });
     } else if (e.target.innerHTML == "Disconnect") {
         port.postMessage({ type: "SCRIPTS", action: "serialDisconnect" });
-    } else if (e.target.innerHTML == "USBs") {
+    } else if ($(this).attr("name") == "usbs") {
         port.postMessage({ type: "SCRIPTS", action: "getUSBs" });
     } else if (e.target.innerHTML == "ConnectUSB") {
         var divice = document.getElementsByName('showUSBs')[0].value;
         port.postMessage({ type: "SCRIPTS", action: "connectUSB", data: divice });
-    } else {
+    } else if ($(this).attr("name") == "devices") {
         port.postMessage({ type: "SCRIPTS", action: "getDevices" });
     }
-    console.log(this); console.log(e);
+    //console.log(this); console.log(e);
     return false;
 }
+
+var toastr_tops = {
+    "closeButton": true,
+    "debug": false,
+    "positionClass": "toast-top-full-width",
+    "onclick": null,
+    "showDuration": "300",
+    "hideDuration": "1000",
+    "timeOut": "3500",
+    "extendedTimeOut": "1000",
+    "showEasing": "swing",
+    "hideEasing": "linear",
+    "showMethod": "fadeIn",
+    "hideMethod": "fadeOut"
+};

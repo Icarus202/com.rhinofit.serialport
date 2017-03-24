@@ -1,15 +1,11 @@
 // JavaScript source code
 chrome.app.runtime.onLaunched.addListener(function () {
-    chrome.app.window.create('window.html', {
-        'outerBounds': {
-            'width': 400,
-            'height': 500
-        }
-    });
-    chrome.app.window.onClosed.addListener(function () {
-        if (serialPort != null) {
-            chrome.serial.disconnect(serialPort.connectionId, serialDisconnect);
-        }
+    chrome.app.window.create('window.html',  function (win) {
+        win.onClosed.addListener(function () {
+            if (serialPort != null) {
+                chrome.serial.disconnect(serialPort.connectionId, serialDisconnect);
+            }
+        });
     });
 });
 
@@ -79,6 +75,7 @@ function testing_background() {
     return {type: "BACKGROUND", text: "background works" };
 }
 
+//*************//
 var serialPort = null;
 var serialConnect = function (connectionInfo) {
     serialPort = connectionInfo;
@@ -97,6 +94,7 @@ var serialDisconnect = function(result) {
 var writeSerial = function (str) {
     chrome.serial.send(serialPort.connectionId, convertStringToArrayBuffer(str), onSend);
 }
+
 // Convert string to ArrayBuffer
 var convertStringToArrayBuffer = function (str) {
     var buf = new ArrayBuffer(str.length);
