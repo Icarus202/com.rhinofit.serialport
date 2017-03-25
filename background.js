@@ -5,14 +5,20 @@ chrome.app.runtime.onLaunched.addListener(function () {
             if (serialPort != null) {
                 chrome.serial.disconnect(serialPort.connectionId, serialDisconnect);
             }
+            if (something.inputSerialPort != null) {
+                chrome.serial.disconnect(something.inputSerialPort.connectionId, inputDisconnect);
+            }
+            if (something.outputSerialPort != null) {
+                chrome.serial.disconnect(something.outputSerialPort.connectionId, outputDisconnect);
+            }
         });
     });
 });
 
-
-
 var ComPortKiosk = function () {
     this.cpk_memory = {};
+    this.outputSerialPort = null;
+    this.inputSerialPort = null;
 };
 
 var load_memory = function(comport, data) {
@@ -24,15 +30,26 @@ var load_memory = function(comport, data) {
     });
 };
 
+var reload_memory = function (comport, data) {
+    comport.cpk_memory = data;
+    port.postMessage({
+        type: "BACKGROUND",
+        callback: "reload_memory",
+        response: comport
+    });
+};
 
+var save_complete = function () {
+    chrome.storage.sync.get(reload_memory.bind(null, something));
+}
 
-var showDevices = function (ports) {
+var showDevices = function (callback, ports) {
     for (var i = 0; i < ports.length; i++) {
         console.log(ports[i].path);
     }
     port.postMessage({
         type: "BACKGROUND",
-        callback: "showDevices",
+        callback: callback,
         response: ports
     });
 }
@@ -69,7 +86,7 @@ chrome.runtime.onConnect.addListener(function (messenger) {
     console.log(port);
     port.onMessage.addListener(function (request, sender) {
         if (request['action'] == "getDevices") {
-            chrome.serial.getDevices(showDevices);
+            chrome.serial.getDevices(showDevices.bind(null, "showOutput"));
         } else if (request['action'] == "serialConnect") {
             chrome.serial.connect(request['data'], { bitrate: 9600 }, serialConnect);
             //add return connect command
@@ -87,6 +104,31 @@ chrome.runtime.onConnect.addListener(function (messenger) {
                 callback: "login",
                 response: { "success": "1" }
             });
+        } else if (request['action'] == "updateInputType") {
+            updateInputType(request['data'])
+            //chrome.usb.getDevices({ "vendorId": 5050, "productId": 24 }, connectUSB.bind(null, request['data']));
+        } else if (request['action'] == "getInputDevices") {
+            if (something.inputSerialPort) {
+                chrome.serial.disconnect(something.inputSerialPort.connectionId, inputDisconnect);
+            }
+            chrome.serial.getDevices(showDevices.bind(null, "showInput"));
+        } else if (request['action'] == "connectInputDevice") {
+            if (something.inputSerialPort) {
+                chrome.serial.disconnect(something.inputSerialPort.connectionId, inputDisconnectReconnect.bind(null, request['data']));
+            } else {
+                chrome.serial.connect(request['data'], { bitrate: 9600 }, inputConnect.bind(null, request['data']));
+            }
+        } else if (request['action'] == "getOutputDevices") {
+            if (something.outputSerialPort) {
+                chrome.serial.disconnect(something.outputSerialPort.connectionId, outputDisconnect);
+            }
+            chrome.serial.getDevices(showDevices.bind(null, "showOutput"));
+        } else if (request['action'] == "connectOutputDevice") {
+            if (something.outputSerialPort) {
+                chrome.serial.disconnect(something.outputSerialPort.connectionId, outputDisconnectReconnect.bind(null, request['data']));
+            } else {
+                chrome.serial.connect(request['data'], { bitrate: 9600 }, outputConnect.bind(null, request['data']));
+            }
         } else {
             port.postMessage(testing_background());
         }
@@ -96,9 +138,16 @@ chrome.runtime.onConnect.addListener(function (messenger) {
     console.log(something['cpk_memory']);
 });
 
+function updateInputType(value) {
+    chrome.storage.sync.set({ "input": { "type": value } }, save_complete);
+    if (value == "USB" && something.inputSerialPort) {
+        chrome.serial.disconnect(something.inputSerialPort.connectionId, inputDisconnect);
+    }
+}
+
 //background needs messenger
 function testing_background() {
-    return {type: "BACKGROUND", text: "background works" };
+    return { type: "BACKGROUND", text: "background works" };
 }
 
 //*************//
@@ -106,20 +155,79 @@ var serialPort = null;
 var serialConnect = function (connectionInfo) {
     serialPort = connectionInfo;
     console.log(serialPort);
-}
+};
 
-var serialDisconnect = function(result) {
+var inputConnect = function (data, connectionInfo) {
+    something.inputSerialPort = connectionInfo;
+    chrome.storage.sync.set({
+        "input":
+            {
+                "type": something['cpk_memory']['input']['type'],
+                "RS232": data
+            }
+    }, save_complete);
+};
+
+var inputDisconnect = function (result) {
+    if (result) {
+        something.inputSerialPort = null;
+    } else {
+        port.postMessage({ type: "BACKGROUND", callback: "error", msg: "Disconnect failed" });
+    }
+};
+
+var inputDisconnectReconnect = function (data, result) {
+    if (result) {
+        something.inputSerialPort = null;
+        if (data != "") {
+            chrome.serial.connect(data, { bitrate: 9600 }, inputConnect.bind(null, data));
+        }
+    } else {
+        port.postMessage({ type: "BACKGROUND", callback: "error", msg: "Disconnect failed" });
+    }
+};
+
+var outputConnect = function (data, connectionInfo) {
+    something.outputSerialPort = connectionInfo;
+    chrome.storage.sync.set({
+        "output":
+            {
+                "RS232": data
+            }
+    }, save_complete);
+};
+
+var outputDisconnect = function (result) {
+    if (result) {
+        something.outputSerialPort = null;
+    } else {
+        port.postMessage({ type: "BACKGROUND", callback: "error", msg: "Disconnect failed" });
+    }
+};
+
+var outputDisconnectReconnect = function (data, result) {
+    if (result) {
+        something.outputSerialPort = null;
+        if (data != "") {
+            chrome.serial.connect(data, { bitrate: 9600 }, outputConnect.bind(null, data));
+        }
+    } else {
+        port.postMessage({ type: "BACKGROUND", callback: "error", msg: "Disconnect failed" });
+    }
+};
+
+var serialDisconnect = function (result) {
     if (result) {
         serialPort = null;
-        port.postMessage( {type: "BACKGROUND", text: "Disconnected from serial port" });
+        port.postMessage({ type: "BACKGROUND", text: "Disconnected from serial port" });
     } else {
-        port.postMessage( {type: "BACKGROUND", text: "Disconnect failed" });
+        port.postMessage({ type: "BACKGROUND", text: "Disconnect failed" });
     }
-}
+};
 
 var writeSerial = function (str) {
     chrome.serial.send(serialPort.connectionId, convertStringToArrayBuffer(str), onSend);
-}
+};
 
 // Convert string to ArrayBuffer
 var convertStringToArrayBuffer = function (str) {
@@ -129,10 +237,10 @@ var convertStringToArrayBuffer = function (str) {
         bufView[i] = str.charCodeAt(i);
     }
     return buf;
-}
+};
 
 var onSend = function (e) {
     console.log(e);
-}
+};
 
 var something = null;
