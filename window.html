@@ -17,53 +17,85 @@
     <link rel="stylesheet" href="other-styles.css" />
 </head>
 <body class="page-body">
-    <div class="page-container">
+    <div class="container">
         <div class="main-content">
-            <div class="container-fluid">
+            <div class="container">
                 <div class="row">
-                    <div class="col-md-6 text-center">
-                        Hello, world!
-                    </div>
-                    <div class="col-md-6 text-center">
-                        Hello, world!
+                    <div class="col-xs-12 text-center">
+                        <h2>Com Port Kiosk</h2>
                     </div>
                 </div>
-                <div><button name="test" class="btn btn-default">Test</button></div>
-                <div class="row">
-                    <div class="col-md-12">
-                        <div class=" form-group">
-                            <label class="control-label">Output Device</label>
-                            <div class="input-group">
-                                <div>
-                                    <select class="form-control" name="showDevices">
-                                        <option value="">No Port</option>
-                                    </select>
-                                </div>
-                                <div class="input-group-btn">
-                                    <button name="devices" class="btn btn-default"><i class="entypo-arrows-ccw"></i></button>
-                                </div>
+                <div id="login-credentials" style="display: none;">
+                    <div class="row">
+                        <div class="col-xs-12 text-center">
+                            <h4>Please Login</h4>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-xs-6">
+                            <label class="control-label">User Name</label>
+                            <input type="text" class="form-control" name="username" placeholder="User Name"/>
+                        </div>
+                        <div class="col-xs-6">
+                            <label class="control-label">Password</label>
+                            <input type="password" class="form-control" name="password" placeholder="Password" />
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-xs-4"></div>
+                        <div class="col-xs-4 text-center">
+                            <button class="btn btn-primary" name="login"><i class="entypo-user"></i> Login</button>
+                        </div>
+                        <div class="col-xs-4"></div>
+                    </div>
+                </div>
+                <div id="login-successful" style="display: none;">
+                    <div class="row">
+                        <div class="col-xs-12 text-center">
+                            <div class="alert alert-success">
+                                <i class="entypo-check"></i> Connected
                             </div>
                         </div>
                     </div>
                 </div>
-                <div><button class="btn btn-default">Connect</button></div>
-                <div><button class="btn btn-default">Send</button></div>
-                <div><button class="btn btn-default">Disconnect</button></div>
-                <div>
-                    <input type="checkbox" checked data-toggle="toggle" data-style="ios" data-onstyle="warning" data-offstyle="info" data-on="USB" data-off="RS232" />
-                </div>
-                <div class="form-group">
-                    <label class="control-label">Input Device</label>
-                    <div class="input-group">
-                        <select class="form-control" name="showUSBs">
-                            <option value="">No USB</option>
-                        </select>
-                        <div class="input-group-btn">
-                            <button name="usbs" class="btn btn-default"><i class="entypo-arrows-ccw"></i></button>
+                <div><button name="test" class="btn btn-default">Test</button></div>
+                <div id="control-panel" style="display: none;">
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class=" form-group">
+                                <label class="control-label">Output Device</label>
+                                <div class="input-group">
+                                    <div>
+                                        <select class="form-control" name="showDevices">
+                                            <option value="">No Port</option>
+                                        </select>
+                                    </div>
+                                    <div class="input-group-btn">
+                                        <button name="devices" class="btn btn-default"><i class="entypo-arrows-ccw"></i></button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
+                    <div><button class="btn btn-default">Connect</button></div>
+                    <div><button class="btn btn-default">Send</button></div>
+                    <div><button class="btn btn-default">Disconnect</button></div>
+                    <div>
+                        <input type="checkbox" checked data-toggle="toggle" data-style="ios" data-onstyle="warning" data-offstyle="info" data-on="USB" data-off="RS232" />
+                    </div>
+                    <div class="form-group">
+                        <label class="control-label">Input Device</label>
+                        <div class="input-group">
+                            <select class="form-control" name="showUSBs">
+                                <option value="">No USB</option>
+                            </select>
+                            <div class="input-group-btn">
+                                <button name="usbs" class="btn btn-default"><i class="entypo-arrows-ccw"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                    <div><button class="btn btn-default">ConnectUSB</button></div>
                 </div>
-                <div><button class="btn btn-default">ConnectUSB</button></div>
             </div>
         </div>
     </div>

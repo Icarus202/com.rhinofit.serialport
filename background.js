@@ -9,6 +9,23 @@ chrome.app.runtime.onLaunched.addListener(function () {
     });
 });
 
+
+
+var ComPortKiosk = function () {
+    this.cpk_memory = {};
+};
+
+var load_memory = function(comport, data) {
+    comport.cpk_memory = data;
+    port.postMessage({
+        type: "BACKGROUND",
+        callback: "load_memory",
+        response: comport
+    });
+};
+
+
+
 var showDevices = function (ports) {
     for (var i = 0; i < ports.length; i++) {
         console.log(ports[i].path);
@@ -64,10 +81,19 @@ chrome.runtime.onConnect.addListener(function (messenger) {
             chrome.usb.getDevices({"vendorId": 5050, "productId": 24}, showUSBs);
         } else if (request['action'] == "connectUSB") {
             chrome.usb.getDevices({ "vendorId": 5050, "productId": 24 }, connectUSB.bind(null, request['data']));
+        } else if (request['action'] == "login") {
+            port.postMessage({
+                type: "BACKGROUND",
+                callback: "login",
+                response: { "success": "1" }
+            });
         } else {
             port.postMessage(testing_background());
         }
     });
+    something = new ComPortKiosk();
+    chrome.storage.sync.get(load_memory.bind(null, something));
+    console.log(something['cpk_memory']);
 });
 
 //background needs messenger
@@ -108,3 +134,5 @@ var convertStringToArrayBuffer = function (str) {
 var onSend = function (e) {
     console.log(e);
 }
+
+var something = null;

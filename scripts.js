@@ -1,6 +1,7 @@
 // JavaScript source code
 var port = null;
 var fixed_size = [600, 600];
+var comport = null;
 document.addEventListener("DOMContentLoaded", function () {
     var buttons = document.querySelectorAll('button');
     [].forEach.call(buttons, function (button) {
@@ -32,6 +33,20 @@ document.addEventListener("DOMContentLoaded", function () {
                 opt.innerHTML = request['response'][i]['productName'];
                 showDevices.appendChild(opt);
             }
+        } else if (request['callback'] == "load_memory") {
+            load_memory(request['response']);
+        } else if (request['callback'] == "login") {
+            if (request['response']['success']) {
+                $("#login-credentials").fadeOut("slow", function () {
+                    $("#login-successful").fadeIn("slow", function () {
+                        $("#control-panel").fadeIn("slow", function () {
+                            //load associated settings
+                        });
+                    });
+                });
+            } else {
+                toastr.error(request['response']['error'], null, toastr_tops);
+            }
         } else {
 
         }
@@ -42,6 +57,21 @@ document.addEventListener("DOMContentLoaded", function () {
         window.resizeTo(fixed_size[0], fixed_size[1]);
     });
 });
+
+function load_memory(data) {
+    comport = data;
+    if (typeof comport['cpk_memory']['token'] === "undefined") {
+        $("#login-credentials").fadeIn("fast", function (data) {
+
+        }).bind(null, comport);
+    } else {
+        $("#login-successful").fadeIn("fast", function (data) {
+            $("#control-panel").fadeIn("fast", function (cp_data) {
+                //load associated settings
+            }).bind(null, data);
+        }).bind(null, comport);
+    }
+}
 
 function clickHandler(e) {
     console.log($(this));
@@ -61,6 +91,8 @@ function clickHandler(e) {
         port.postMessage({ type: "SCRIPTS", action: "connectUSB", data: divice });
     } else if ($(this).attr("name") == "devices") {
         port.postMessage({ type: "SCRIPTS", action: "getDevices" });
+    } else if ($(this).attr("name") == "login") {
+        port.postMessage({ type: "SCRIPTS", action: "login" });
     }
     //console.log(this); console.log(e);
     return false;
