@@ -19,6 +19,9 @@ var ComPortKiosk = function () {
     this.cpk_memory = {};
     this.outputSerialPort = null;
     this.inputSerialPort = null;
+    this.initiated = false;
+    this.inputInitiated = false;
+    this.outputInitiated = false;
 };
 
 var load_memory = function(comport, data) {
@@ -116,7 +119,11 @@ chrome.runtime.onConnect.addListener(function (messenger) {
             if (something.inputSerialPort) {
                 chrome.serial.disconnect(something.inputSerialPort.connectionId, inputDisconnectReconnect.bind(null, request['data']));
             } else {
-                chrome.serial.connect(request['data'], { bitrate: 9600 }, inputConnect.bind(null, request['data']));
+                if (request['data'] != "") {
+                    chrome.serial.connect(request['data'], { bitrate: 9600 }, inputConnect.bind(null, request['data']));
+                } else {
+                    inputConnect("", null);
+                }
             }
         } else if (request['action'] == "getOutputDevices") {
             if (something.outputSerialPort) {
@@ -127,7 +134,26 @@ chrome.runtime.onConnect.addListener(function (messenger) {
             if (something.outputSerialPort) {
                 chrome.serial.disconnect(something.outputSerialPort.connectionId, outputDisconnectReconnect.bind(null, request['data']));
             } else {
-                chrome.serial.connect(request['data'], { bitrate: 9600 }, outputConnect.bind(null, request['data']));
+                if (request['data'] != "") {
+                    chrome.serial.connect(request['data'], { bitrate: 9600 }, outputConnect.bind(null, request['data']));
+                } else {
+                    outputConnect("", null);
+                }
+            }
+        } else if (request['action'] == "fullyInitiated") {
+            if (something.inputInitiated && something.outputInitiated) {
+                something.initiated = true;
+                port.postMessage({
+                    type: "BACKGROUND",
+                    callback: "reload_memory",
+                    response: something
+                });
+            } else {
+                port.postMessage({
+                    type: "BACKGROUND",
+                    callback: "not_initiated",
+                    response: something
+                });
             }
         } else {
             port.postMessage(testing_background());
@@ -139,9 +165,15 @@ chrome.runtime.onConnect.addListener(function (messenger) {
 });
 
 function updateInputType(value) {
-    chrome.storage.sync.set({ "input": { "type": value } }, save_complete);
-    if (value == "USB" && something.inputSerialPort) {
-        chrome.serial.disconnect(something.inputSerialPort.connectionId, inputDisconnect);
+    if (something.initiated) {
+        chrome.storage.sync.set({ "input": { "type": value } }, save_complete);
+        if (value == "USB" && something.inputSerialPort) {
+            chrome.serial.disconnect(something.inputSerialPort.connectionId, inputDisconnect);
+        }
+    } else {
+        if (value == "USB") {
+            something.inputInitiated = true;
+        }
     }
 }
 
@@ -159,10 +191,18 @@ var serialConnect = function (connectionInfo) {
 
 var inputConnect = function (data, connectionInfo) {
     something.inputSerialPort = connectionInfo;
+    if (!something.initiated) {
+        something.inputInitiated = true;
+    }
+    var type = "USB";
+    if (typeof something['cpk_memory']['input'] !== "undefined"
+        && typeof something['cpk_memory']['input']['type'] !== "undefined") {
+        type = something['cpk_memory']['input']['type'];
+    }
     chrome.storage.sync.set({
         "input":
             {
-                "type": something['cpk_memory']['input']['type'],
+                "type": type,
                 "RS232": data
             }
     }, save_complete);
@@ -171,6 +211,18 @@ var inputConnect = function (data, connectionInfo) {
 var inputDisconnect = function (result) {
     if (result) {
         something.inputSerialPort = null;
+        var type = "USB";
+        if (typeof something['cpk_memory']['input'] !== "undefined"
+            && typeof something['cpk_memory']['input']['type'] !== "undefined") {
+            type = something['cpk_memory']['input']['type'];
+        }
+        chrome.storage.sync.set({
+            "input":
+                {
+                    "type": type,
+                    "RS232": ""
+                }
+        }, save_complete);
     } else {
         port.postMessage({ type: "BACKGROUND", callback: "error", msg: "Disconnect failed" });
     }
@@ -181,14 +233,37 @@ var inputDisconnectReconnect = function (data, result) {
         something.inputSerialPort = null;
         if (data != "") {
             chrome.serial.connect(data, { bitrate: 9600 }, inputConnect.bind(null, data));
+        } else {
+            if (!something.initiated) {
+                something.inputInitiated = true;
+            } else {
+                var type = "USB";
+                if (typeof something['cpk_memory']['input'] !== "undefined"
+                    && typeof something['cpk_memory']['input']['type'] !== "undefined") {
+                    type = something['cpk_memory']['input']['type'];
+                }
+                chrome.storage.sync.set({
+                    "input":
+                        {
+                            "type": type,
+                            "RS232": ""
+                        }
+                }, save_complete);
+            }
         }
     } else {
         port.postMessage({ type: "BACKGROUND", callback: "error", msg: "Disconnect failed" });
+        if (!something.initiated) {
+            something.inputInitiated = true;
+        }
     }
 };
 
 var outputConnect = function (data, connectionInfo) {
     something.outputSerialPort = connectionInfo;
+    if (!something.initiated) {
+        something.outputInitiated = true;
+    }
     chrome.storage.sync.set({
         "output":
             {
@@ -200,6 +275,12 @@ var outputConnect = function (data, connectionInfo) {
 var outputDisconnect = function (result) {
     if (result) {
         something.outputSerialPort = null;
+        chrome.storage.sync.set({
+            "output":
+                {
+                    "RS232": ""
+                }
+        }, save_complete);
     } else {
         port.postMessage({ type: "BACKGROUND", callback: "error", msg: "Disconnect failed" });
     }
@@ -210,9 +291,23 @@ var outputDisconnectReconnect = function (data, result) {
         something.outputSerialPort = null;
         if (data != "") {
             chrome.serial.connect(data, { bitrate: 9600 }, outputConnect.bind(null, data));
+        } else {
+            if (!something.initiated) {
+                something.outputInitiated = true;
+            } else {
+                chrome.storage.sync.set({
+                    "output":
+                        {
+                            "RS232": ""
+                        }
+                }, save_complete);
+            }
         }
     } else {
         port.postMessage({ type: "BACKGROUND", callback: "error", msg: "Disconnect failed" });
+        if (!something.initiated) {
+            something.outputInitiated = true;
+        }
     }
 };
 

@@ -6,9 +6,26 @@ MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{AE123430-321B-45A8-915C-2BFD68001BB8}"
 	ProjectSection(SolutionItems) = preProject
 		background.js = background.js
+		bootstrap-theme.min.css = bootstrap-theme.min.css
+		bootstrap-toggle.min.css = bootstrap-toggle.min.css
+		bootstrap-toggle.min.js = bootstrap-toggle.min.js
+		bootstrap.min.css = bootstrap.min.css
+		bootstrap.min.js = bootstrap.min.js
+		calculator-128.png = calculator-128.png
+		calculator-16.png = calculator-16.png
 		chrome-128.png = chrome-128.png
+		entypo.css = entypo.css
+		entypo.eot = entypo.eot
+		entypo.svg = entypo.svg
+		entypo.ttf = entypo.ttf
+		entypo.woff = entypo.woff
+		jquery-1.11.0.min.js = jquery-1.11.0.min.js
+		jquery-ui.min.js = jquery-ui.min.js
 		manifest.json = manifest.json
+		other-styles.css = other-styles.css
 		scripts.js = scripts.js
+		toastr.min.css = toastr.min.css
+		toastr.min.js = toastr.min.js
 		window.html = window.html
 	EndProjectSection
 EndProject

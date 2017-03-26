@@ -25,13 +25,27 @@ document.addEventListener("DOMContentLoaded", function () {
             opt.value = "";
             opt.innerHTML = "Please Select";
             showDevices.appendChild(opt);
+            var RS232 = "";
+            if (typeof comport['cpk_memory']['input'] !== "undefined"
+                && typeof comport['cpk_memory']['input']['RS232'] !== "undefined") {
+                RS232 = comport['cpk_memory']['input']['RS232'];
+            }
             for (var i = 0; i < request['response'].length; i++) {
-                if ($("select[name=showInput").val() != request['response'][i]['path']) {
+                if ($("select[name=showInput").val() != request['response'][i]['path']
+                    && RS232 != request['response'][i]['path']) {
                     var opt = document.createElement('option');
                     opt.value = request['response'][i]['path'];
                     opt.innerHTML = request['response'][i]['displayName'] + ': ' + request['response'][i]['path'];
                     showDevices.appendChild(opt);
                 }
+            }
+            RS232 = "";
+            if (typeof comport['cpk_memory']['output'] !== "undefined"
+                && typeof comport['cpk_memory']['output']['RS232'] !== "undefined") {
+                RS232 = comport['cpk_memory']['output']['RS232'];
+            }
+            if (!comport.initiated) {
+                $("select[name=showOutput").val(RS232).change();
             }
         } else if (request['callback'] == "showInput") {
             var showDevices = document.getElementsByName('showInput')[0];
@@ -40,13 +54,27 @@ document.addEventListener("DOMContentLoaded", function () {
             opt.value = "";
             opt.innerHTML = "Please Select";
             showDevices.appendChild(opt);
+            var RS232 = "";
+            if (typeof comport['cpk_memory']['output'] !== "undefined"
+                && typeof comport['cpk_memory']['output']['RS232'] !== "undefined") {
+                RS232 = comport['cpk_memory']['output']['RS232'];
+            }
             for (var i = 0; i < request['response'].length; i++) {
-                if ($("select[name=showDevices").val() != request['response'][i]['path']) {
+                if ($("select[name=showOutput").val() != request['response'][i]['path']
+                    && RS232 != request['response'][i]['path']) {
                     opt = document.createElement('option');
                     opt.value = request['response'][i]['path'];
                     opt.innerHTML = request['response'][i]['displayName'] + ': ' + request['response'][i]['path'];
                     showDevices.appendChild(opt);
                 }
+            }
+            RS232 = "";
+            if (typeof comport['cpk_memory']['input'] !== "undefined"
+                && typeof comport['cpk_memory']['input']['RS232'] !== "undefined") {
+                RS232 = comport['cpk_memory']['input']['RS232'];
+            }
+            if (!comport.initiated) {
+                $("select[name=showInput").val(RS232).change();
             }
         } else if (request['callback'] == "load_memory") {
             /* load_memory builds underlying object */
@@ -54,6 +82,9 @@ document.addEventListener("DOMContentLoaded", function () {
         } else if (request['callback'] == "reload_memory") {
             /* load_memory builds underlying object */
             reload_memory(request['response']);
+        } else if (request['callback'] == "not_initiated") {
+            comport = request['response'];
+            setTimeout(function () { port.postMessage({ type: "SCRIPTS", action: "fullyInitiated" }); }, 500);
         } else if (request['callback'] == "login") {
             if (request['response']['success']) {
                 $("#login-credentials").fadeOut("slow", function () {
@@ -91,10 +122,19 @@ function load_memory(data) {
         $("#login-successful").fadeIn("fast", function (data) {
             $("#control-panel").fadeIn("fast", function (cp_data) {
                 //load associated settings
-                if (comport['cpk_memory']['input']) {
-                    if (comport['cpk_memory']['input']['type'] == "RS232") {
-                        $('input[name=input-type]').prop('checked', false).change();
+                if (typeof comport['cpk_memory']['input'] !== "undefined" && comport['cpk_memory']['input']) {
+                    var type = "USB";
+                    if (typeof comport['cpk_memory']['input']['type'] !== "undefined") {
+                        type = comport['cpk_memory']['input']['type'];
                     }
+                    if (type == "RS232") {
+                        $('input[name=input-type]').prop('checked', false).change();
+                        //getInputDevices(); triggered internally on input-type change...
+                    } else {
+                        port.postMessage({ type: "SCRIPTS", action: "connectInputDevice", data: "USB" });
+                    }
+                    getOutputDevices();
+                    setTimeout(function () { port.postMessage({ type: "SCRIPTS", action: "fullyInitiated" }); }, 500);
                 }
             }).bind(null, data);
         }).bind(null, comport);
@@ -122,8 +162,9 @@ function clickHandler(e) {
     } else if (e.target.innerHTML == "Disconnect") {
         serialDisconnect(); /*updated*/
     } else if ($(this).attr("name") == "InputDevices") {
+        //$("div[name=input-control-box]").removeClass("alert-success").addClass("alert-warning");
         getInputDevices();
-        //port.postMessage({ type: "SCRIPTS", action: "getUSBs" });
+        //port.postMessage({ type: "SCRIPTS", action: "getUSBs" }); 
     } else if ($(this).attr("name") == "OutputDevices") {
         getOutputDevices();
     } else if (e.target.innerHTML == "ConnectUSB") {
@@ -161,13 +202,14 @@ var selectInputType = function (memory_load) {
     } else {
         port.postMessage({ type: "SCRIPTS", action: "updateInputType", data: "RS232" });
         $("#input-rs232:hidden").fadeIn("slow", function () {
-            $("div[name=input-control-box]").removeClass("alert-success").addClass("alert-warning");
+            //$("div[name=input-control-box]").removeClass("alert-success").addClass("alert-warning");
             getInputDevices();
         });
     }
 };
 
 var getInputDevices = function () {
+    $("div[name=input-control-box].alert-success").removeClass("alert-success").addClass("alert-warning");
     port.postMessage({ type: "SCRIPTS", action: "getInputDevices" });
 }
 
@@ -177,6 +219,7 @@ var connectInputTrigger = function () {
 };
 
 var getOutputDevices = function () {
+    $("div[name=output-control-box].alert-success").removeClass("alert-success").addClass("alert-warning");
     port.postMessage({ type: "SCRIPTS", action: "getOutputDevices" });
 };
 
