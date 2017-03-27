@@ -1,7 +1,9 @@
 // JavaScript source code
 var port = null;
-var fixed_size = [600, 600];
+var fixed_size = [600, 500];
 var comport = null;
+var loadLimiter = 0;
+var todo_list = {};
 document.addEventListener("DOMContentLoaded", function () {
     var buttons = document.querySelectorAll('button');
     [].forEach.call(buttons, function (button) {
@@ -46,6 +48,27 @@ document.addEventListener("DOMContentLoaded", function () {
             }
             if (!comport.initiated) {
                 $("select[name=showOutput").val(RS232).change();
+            } else {
+                var type = "USB";
+                //if (typeof comport['cpk_memory']['input'] !== "undefined"
+                //    && typeof comport['cpk_memory']['input']['type'] !== "undefined") {
+                //    type = comport['cpk_memory']['input']['type'];
+                //}
+                if ($("input[name=input-type]").is(":checked")) {
+                    type = "USB";
+                } else {
+                    type = "RS232";
+                }
+                if (type == "USB" || comport.inputSerialPort) {
+                    loadLimiter = 0;
+                } else {
+                    if (loadLimiter > 0) {
+                        loadLimiter = 0;
+                    } else if (type == "RS232" && loadLimiter == 0) {
+                        getInputDevices(); /* load opposing when applicable */
+                        loadLimiter = loadLimiter + 1;
+                    }
+                }
             }
         } else if (request['callback'] == "showInput") {
             var showDevices = document.getElementsByName('showInput')[0];
@@ -75,6 +98,17 @@ document.addEventListener("DOMContentLoaded", function () {
             }
             if (!comport.initiated) {
                 $("select[name=showInput").val(RS232).change();
+            } else {
+                if (comport.outputSerialPort) {
+                    loadLimiter = 0;
+                } else {
+                    if (loadLimiter > 0) {
+                        loadLimiter = 0;
+                    } else if (loadLimiter == 0) {
+                        getOutputDevices(); /* load opposing when applicable */
+                        loadLimiter = loadLimiter + 1;
+                    }
+                }
             }
         } else if (request['callback'] == "load_memory") {
             /* load_memory builds underlying object */
@@ -90,6 +124,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 $("#login-credentials").fadeOut("slow", function () {
                     $("#login-successful").fadeIn("slow", function () {
                         $("#control-panel").fadeIn("slow", function () {
+                            $('button[name=logout]').fadeIn("slow");
                             //load associated settings
                             getOutputDevices();
                         });
@@ -101,9 +136,36 @@ document.addEventListener("DOMContentLoaded", function () {
         } else if (request['callback'] == "error") {
             /* load_memory builds underlying object */
             toastr.error(request['msg'], null, toastr_tops);
-        } else {
+        } else if (request['callback'] == "focus") {
+            /* load_memory builds underlying object */
+            $('input[name=input-type]').focus();
+        } else if (request['callback'] == "post_memory") {
+            /* load_memory builds underlying object */
+            post_memory(request['response']);
+        }//else if (request['callback'] == "connecterror") {
+         //  if (request['target'] == "input") {
+         //      $("div[name=output-control-box].alert-warning").removeClass("alert-warning").addClass("alert-success");
+         //  } else if (request['target'] == "output") {
+         //      $("div[name=output-control-box].alert-warning").removeClass("alert-warning").addClass("alert-success");
+         //  }
+         //  toastr.error(request['msg'], null, toastr_tops);
+        //} else {
+        //
+        //}
+    });
 
+    $(window).scannerDetection();//{ ignoreIfFocusOn: "input[name='username']" });
+    $(window).bind('scannerDetectionComplete', function (e, data) {
+        if (typeof comport['cpk_memory']['input'] !== "undefined"
+           && typeof comport['cpk_memory']['input']['type'] !== "undefined"
+           && comport['cpk_memory']['input']['type'] == "USB") {
+            toastr.info(data["string"], null, toastr_tops);
+            if (comport.outputSerialPort) {
+                port.postMessage({ type: "SCRIPTS", action: "sendMessage", data: data["string"] });
+            }
         }
+        //$("input[name='username']").val(data["string"], top.document);
+        //$("input[name='username']").autocomplete("search", data["string"]);
     });
 
     window.resizeTo(fixed_size[0], fixed_size[1]);
@@ -116,11 +178,12 @@ function load_memory(data) {
     comport = data;
     if (typeof comport['cpk_memory']['token'] === "undefined") {
         $("#login-credentials").fadeIn("fast", function (data) {
-
+            //port.postMessage({ type: "SCRIPTS", action: "fullyInitiated", data: true });
         }).bind(null, comport);
     } else {
         $("#login-successful").fadeIn("fast", function (data) {
             $("#control-panel").fadeIn("fast", function (cp_data) {
+                $('button[name=logout]').fadeIn("slow");
                 //load associated settings
                 if (typeof comport['cpk_memory']['input'] !== "undefined" && comport['cpk_memory']['input']) {
                     var type = "USB";
@@ -131,23 +194,43 @@ function load_memory(data) {
                         $('input[name=input-type]').prop('checked', false).change();
                         //getInputDevices(); triggered internally on input-type change...
                     } else {
-                        port.postMessage({ type: "SCRIPTS", action: "connectInputDevice", data: "USB" });
+                        $('input[name=input-type]').prop('checked', true).change();
+                        //port.postMessage({ type: "SCRIPTS", action: "connectInputDevice", data: "USB" });
                     }
-                    getOutputDevices();
-                    setTimeout(function () { port.postMessage({ type: "SCRIPTS", action: "fullyInitiated" }); }, 500);
                 }
+                if (typeof comport['cpk_memory']['output'] !== "undefined" && comport['cpk_memory']['output']) {
+                    getOutputDevices();
+                }
+                setTimeout(function () { port.postMessage({ type: "SCRIPTS", action: "fullyInitiated" }); }, 500);
             }).bind(null, data);
         }).bind(null, comport);
     }
 }
 
+function post_memory(data) {
+    comport = data;
+}
+
 function reload_memory(data) {
     comport = data;
-    if (comport.inputSerialPort) {
+    var type = "USB";
+    if (typeof comport['cpk_memory']['input'] !== "undefined"
+        && typeof comport['cpk_memory']['input']['type'] !== "undefined") {
+        type = comport['cpk_memory']['input']['type'];
+    }
+    if (type == "USB" || comport.inputSerialPort) {
         $("div[name=input-control-box].alert-warning").removeClass("alert-warning").addClass("alert-success");
     }
     if (comport.outputSerialPort) {
         $("div[name=output-control-box].alert-warning").removeClass("alert-warning").addClass("alert-success");
+    }
+    if (todo_list['refreshInput']) {
+        todo_list['refreshInput'] = false;
+        getInputDevices();
+    }
+    if (todo_list['refreshOutput']) {
+        todo_list['refreshOutput'] = false;
+        getOutputDevices();
     }
 }
 
@@ -174,6 +257,9 @@ function clickHandler(e) {
         port.postMessage({ type: "SCRIPTS", action: "getDevices" });
     } else if ($(this).attr("name") == "login") {
         port.postMessage({ type: "SCRIPTS", action: "login" });
+    } else if ($(this).attr("name") == "logout") {
+        port.postMessage({ type: "SCRIPTS", action: "logout" });
+        window.close();
     }
     //console.log(this); console.log(e);
     return false;
@@ -216,6 +302,9 @@ var getInputDevices = function () {
 var connectInputTrigger = function () {
     $("div[name=input-control-box].alert-success").removeClass("alert-success").addClass("alert-warning");
     port.postMessage({ type: "SCRIPTS", action: "connectInputDevice", data: $(this).val() });
+    if (comport.outputSerialPort) { } else {
+        todo_list["refreshOutput"] = true;
+    }
 };
 
 var getOutputDevices = function () {
@@ -223,9 +312,24 @@ var getOutputDevices = function () {
     port.postMessage({ type: "SCRIPTS", action: "getOutputDevices" });
 };
 
-var connectOutputTrigger = function () {
+var connectOutputTrigger = function (e) {
     $("div[name=output-control-box].alert-success").removeClass("alert-success").addClass("alert-warning");
     port.postMessage({ type: "SCRIPTS", action: "connectOutputDevice", data: $(this).val() });
+    var type = "USB";
+    //if (typeof comport['cpk_memory']['input'] !== "undefined"
+    //    && typeof comport['cpk_memory']['input']['type'] !== "undefined") {
+    //    type = comport['cpk_memory']['input']['type'];
+    //}
+    if ($("input[name=input-type]").is(":checked")) {
+        type = "USB";
+    } else {
+        type = "RS232";
+    }
+    if (type == "RS232") {
+        if (comport.inputSerialPort) { } else {
+            todo_list["refreshInput"] = true;
+        }
+    }
 };
 
 var toastr_tops = {

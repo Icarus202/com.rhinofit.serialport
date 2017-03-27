@@ -44,7 +44,19 @@ var reload_memory = function (comport, data) {
 
 var save_complete = function () {
     chrome.storage.sync.get(reload_memory.bind(null, something));
+};
+
+var token_login = function (comport, data) {
+    port.postMessage({
+        type: "BACKGROUND",
+        callback: "post_memory",
+        response: comport
+    });
 }
+
+var token_complete = function () {
+    chrome.storage.sync.get(token_login.bind(null, something));
+};
 
 var showDevices = function (callback, ports) {
     for (var i = 0; i < ports.length; i++) {
@@ -74,7 +86,6 @@ var connectUSB = function (data, ports) {
             chrome.usb.openDevice(ports[i], usbConnect);
         }
     }
-
 }
 
 var usbPort = null;
@@ -102,11 +113,13 @@ chrome.runtime.onConnect.addListener(function (messenger) {
         } else if (request['action'] == "connectUSB") {
             chrome.usb.getDevices({ "vendorId": 5050, "productId": 24 }, connectUSB.bind(null, request['data']));
         } else if (request['action'] == "login") {
+            something.initiated = true;
             port.postMessage({
                 type: "BACKGROUND",
                 callback: "login",
                 response: { "success": "1" }
             });
+            chrome.storage.sync.set({ "token": "logged-in" }, token_complete);
         } else if (request['action'] == "updateInputType") {
             updateInputType(request['data'])
             //chrome.usb.getDevices({ "vendorId": 5050, "productId": 24 }, connectUSB.bind(null, request['data']));
@@ -119,8 +132,14 @@ chrome.runtime.onConnect.addListener(function (messenger) {
             if (something.inputSerialPort) {
                 chrome.serial.disconnect(something.inputSerialPort.connectionId, inputDisconnectReconnect.bind(null, request['data']));
             } else {
-                if (request['data'] != "") {
-                    chrome.serial.connect(request['data'], { bitrate: 9600 }, inputConnect.bind(null, request['data']));
+                if (request['data'] != null && request['data'] != "") {
+                    try {
+                        chrome.serial.connect(request['data'], { bitrate: 9600 }, inputConnect.bind(null, request['data']));
+                    }
+                    catch (err) {
+                        port.postMessage({ type: "BACKGROUND", callback: "error", msg: "Port Already in use." });
+                        //port.postMessage({ type: "BACKGROUND", callback: "connecterror", "target": "output", msg: "Port Already in use." });
+                    }
                 } else {
                     inputConnect("", null);
                 }
@@ -134,13 +153,23 @@ chrome.runtime.onConnect.addListener(function (messenger) {
             if (something.outputSerialPort) {
                 chrome.serial.disconnect(something.outputSerialPort.connectionId, outputDisconnectReconnect.bind(null, request['data']));
             } else {
-                if (request['data'] != "") {
-                    chrome.serial.connect(request['data'], { bitrate: 9600 }, outputConnect.bind(null, request['data']));
+                if (request['data'] != null && request['data'] != "") {
+                    try {
+                        chrome.serial.connect(request['data'], { bitrate: 9600 }, outputConnect.bind(null, request['data']));
+                    }
+                    catch (err) {
+                        port.postMessage({ type: "BACKGROUND", callback: "error", msg: "Port Already in use." });
+                        //port.postMessage({ type: "BACKGROUND", callback: "connecterror", "target": "output", msg: "Port Already in use." });
+                    }
                 } else {
                     outputConnect("", null);
                 }
             }
         } else if (request['action'] == "fullyInitiated") {
+            if (request['data']) {
+                something.inputInitiated = true;
+                something.outputInitiated = true;
+            }
             if (something.inputInitiated && something.outputInitiated) {
                 something.initiated = true;
                 port.postMessage({
@@ -155,6 +184,9 @@ chrome.runtime.onConnect.addListener(function (messenger) {
                     response: something
                 });
             }
+        } else if (request['action'] == "logout") {
+            chrome.storage.sync.clear(onClear);
+            //Possibly reinstance some variables?
         } else {
             port.postMessage(testing_background());
         }
@@ -163,6 +195,23 @@ chrome.runtime.onConnect.addListener(function (messenger) {
     chrome.storage.sync.get(load_memory.bind(null, something));
     console.log(something['cpk_memory']);
 });
+
+function onClear() {
+    something = new ComPortKiosk();
+    chrome.app.window.create('window.html', function (win) {
+        win.onClosed.addListener(function () {
+            if (serialPort != null) {
+                chrome.serial.disconnect(serialPort.connectionId, serialDisconnect);
+            }
+            if (something.inputSerialPort != null) {
+                chrome.serial.disconnect(something.inputSerialPort.connectionId, inputDisconnect);
+            }
+            if (something.outputSerialPort != null) {
+                chrome.serial.disconnect(something.outputSerialPort.connectionId, outputDisconnect);
+            }
+        });
+    });
+}
 
 function updateInputType(value) {
     if (something.initiated) {
@@ -232,7 +281,12 @@ var inputDisconnectReconnect = function (data, result) {
     if (result) {
         something.inputSerialPort = null;
         if (data != "") {
-            chrome.serial.connect(data, { bitrate: 9600 }, inputConnect.bind(null, data));
+            try {
+                chrome.serial.connect(data, { bitrate: 9600 }, inputConnect.bind(null, data));
+            } catch (err) {
+                port.postMessage({ type: "BACKGROUND", callback: "error", msg: "Port Already in use." });
+                //port.postMessage({ type: "BACKGROUND", callback: "connecterror", "target": "output", msg: "Port Already in use." });
+            }
         } else {
             if (!something.initiated) {
                 something.inputInitiated = true;
@@ -290,7 +344,12 @@ var outputDisconnectReconnect = function (data, result) {
     if (result) {
         something.outputSerialPort = null;
         if (data != "") {
-            chrome.serial.connect(data, { bitrate: 9600 }, outputConnect.bind(null, data));
+            try {
+                chrome.serial.connect(data, { bitrate: 9600 }, outputConnect.bind(null, data));
+            } catch (err) {
+                port.postMessage({ type: "BACKGROUND", callback: "error", msg: "Port Already in use." });
+                //port.postMessage({ type: "BACKGROUND", callback: "connecterror", "target": "output", msg: "Port Already in use." });
+            }
         } else {
             if (!something.initiated) {
                 something.outputInitiated = true;
@@ -321,7 +380,7 @@ var serialDisconnect = function (result) {
 };
 
 var writeSerial = function (str) {
-    chrome.serial.send(serialPort.connectionId, convertStringToArrayBuffer(str), onSend);
+    chrome.serial.send(something.outputSerialPort.connectionId, convertStringToArrayBuffer(str), onSend);
 };
 
 // Convert string to ArrayBuffer
@@ -335,6 +394,9 @@ var convertStringToArrayBuffer = function (str) {
 };
 
 var onSend = function (e) {
+    if (something['cpk_memory']['input']['type'] == "USB") {
+        port.postMessage({ type: "BACKGROUND", callback: "focus" });
+    }
     console.log(e);
 };
 
