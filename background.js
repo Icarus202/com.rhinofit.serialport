@@ -47,6 +47,7 @@ var save_complete = function () {
 };
 
 var token_login = function (comport, data) {
+    comport.cpk_memory = data;
     port.postMessage({
         type: "BACKGROUND",
         callback: "post_memory",
@@ -119,7 +120,7 @@ chrome.runtime.onConnect.addListener(function (messenger) {
                 callback: "login",
                 response: { "success": "1" }
             });
-            chrome.storage.sync.set({ "token": "logged-in" }, token_complete);
+            chrome.storage.sync.set({ "token": request["token"] }, token_complete);
         } else if (request['action'] == "updateInputType") {
             updateInputType(request['data'])
             //chrome.usb.getDevices({ "vendorId": 5050, "productId": 24 }, connectUSB.bind(null, request['data']));
@@ -159,7 +160,6 @@ chrome.runtime.onConnect.addListener(function (messenger) {
                     }
                     catch (err) {
                         port.postMessage({ type: "BACKGROUND", callback: "error", msg: "Port Already in use." });
-                        //port.postMessage({ type: "BACKGROUND", callback: "connecterror", "target": "output", msg: "Port Already in use." });
                     }
                 } else {
                     outputConnect("", null);

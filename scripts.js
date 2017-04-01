@@ -131,7 +131,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     });
                 });
             } else {
-                toastr.error(request['response']['error'], null, toastr_tops);
+                toastr.error(request['response']['msg'], null, toastr_tops);
             }
         } else if (request['callback'] == "error") {
             /* load_memory builds underlying object */
@@ -159,13 +159,37 @@ document.addEventListener("DOMContentLoaded", function () {
         if (typeof comport['cpk_memory']['input'] !== "undefined"
            && typeof comport['cpk_memory']['input']['type'] !== "undefined"
            && comport['cpk_memory']['input']['type'] == "USB") {
-            toastr.info(data["string"], null, toastr_tops);
-            if (comport.outputSerialPort) {
-                port.postMessage({ type: "SCRIPTS", action: "sendMessage", data: data["string"] });
-            }
+            $.post(
+                "http://test20.rhinofit.ca/api",
+                {
+                    "action": "comportvaliduser",
+                    "token": comport['cpk_memory']['token'],
+                    "barcodeid": data["string"]
+                },
+                function (a_response) {
+                    if (typeof a_response["error"] !== "undefined") {
+                        port.postMessage({ type: "BACKGROUND", callback: "login", response: { "error": 1, "msg": a_response["error"] } });
+                    } else {
+                        if (a_response["success"] == 1) {
+                            if (a_response["alerttype"] == 0) {
+                                if (comport.outputSerialPort) {
+                                    toastr.success(data["string"], null, toastr_tops);
+                                    port.postMessage({ type: "SCRIPTS", action: "sendMessage", data: data["string"] });
+                                } else {
+                                    toastr.info(data["string"], "Output Not Configured", toastr_tops);
+                                }
+                            } else {
+                                toastr.warning("User has no membership or is overdue.", null, toastr_tops);
+                            }
+                        } else {
+                            toastr.error(a_response["msg"], null, toastr_tops);
+                        }
+                    }
+                }
+            ).fail(function () {
+                toastr.error("Barcode ID query failed", null, toastr_tops);
+            });
         }
-        //$("input[name='username']").val(data["string"], top.document);
-        //$("input[name='username']").autocomplete("search", data["string"]);
     });
 
     window.resizeTo(fixed_size[0], fixed_size[1]);
@@ -256,7 +280,23 @@ function clickHandler(e) {
     } else if ($(this).attr("name") == "devices") {
         port.postMessage({ type: "SCRIPTS", action: "getDevices" });
     } else if ($(this).attr("name") == "login") {
-        port.postMessage({ type: "SCRIPTS", action: "login" });
+        $.post(
+            "http://test20.rhinofit.ca/api",
+            {
+                "action": "login",
+                "email": $('#login-credentials input[name=username]').val(),
+                "password": $('#login-credentials input[name=password]').val()
+            },
+            function (a_response) {
+                if (a_response["error"]) {
+                    toastr.error(a_response["error"], null, toastr_tops);
+                } else {
+                    port.postMessage({ type: "SCRIPTS", action: "login", token: a_response["token"] });
+                }
+            }
+        ).fail(function () {
+            toastr.error("Login attempt failed", null, toastr_tops);
+        });
     } else if ($(this).attr("name") == "logout") {
         port.postMessage({ type: "SCRIPTS", action: "logout" });
         window.close();
