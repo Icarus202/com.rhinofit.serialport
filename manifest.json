@@ -9,7 +9,7 @@
   },
   "app": {
     "background": {
-        "scripts":  ["background.js"]
+        "scripts":  ["background.js", "jquery-1.11.0.min.js"]
     }
   },
   "permissions": [

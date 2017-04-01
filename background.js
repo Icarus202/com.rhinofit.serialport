@@ -2,14 +2,18 @@
 chrome.app.runtime.onLaunched.addListener(function () {
     chrome.app.window.create('window.html',  function (win) {
         win.onClosed.addListener(function () {
-            if (serialPort != null) {
-                chrome.serial.disconnect(serialPort.connectionId, serialDisconnect);
-            }
-            if (something.inputSerialPort != null) {
-                chrome.serial.disconnect(something.inputSerialPort.connectionId, inputDisconnect);
-            }
-            if (something.outputSerialPort != null) {
-                chrome.serial.disconnect(something.outputSerialPort.connectionId, outputDisconnect);
+            //if (serialPort != null) {
+            //    chrome.serial.disconnect(serialPort.connectionId, serialDisconnect);
+            //}
+            if (something.inputSerialPort != null && something.outputSerialPort != null) {
+                fullDisconnect();
+            } else {
+                if (something.inputSerialPort != null) {
+                    chrome.serial.disconnect(something.inputSerialPort.connectionId, inputClear);
+                }
+                if (something.outputSerialPort != null) {
+                    chrome.serial.disconnect(something.outputSerialPort.connectionId, outputClear);
+                }
             }
         });
     });
@@ -22,6 +26,7 @@ var ComPortKiosk = function () {
     this.initiated = false;
     this.inputInitiated = false;
     this.outputInitiated = false;
+    this.serialInputStr = "";
 };
 
 var load_memory = function(comport, data) {
@@ -50,9 +55,17 @@ var token_login = function (comport, data) {
     comport.cpk_memory = data;
     port.postMessage({
         type: "BACKGROUND",
-        callback: "post_memory",
-        response: comport
+        callback: "login",
+        response: {
+            "success": "1",
+            "comport": comport
+        }
     });
+    //port.postMessage({
+    //    type: "BACKGROUND",
+    //    callback: "post_memory",
+    //    response: comport
+    //});
 }
 
 var token_complete = function () {
@@ -115,11 +128,6 @@ chrome.runtime.onConnect.addListener(function (messenger) {
             chrome.usb.getDevices({ "vendorId": 5050, "productId": 24 }, connectUSB.bind(null, request['data']));
         } else if (request['action'] == "login") {
             something.initiated = true;
-            port.postMessage({
-                type: "BACKGROUND",
-                callback: "login",
-                response: { "success": "1" }
-            });
             chrome.storage.sync.set({ "token": request["token"] }, token_complete);
         } else if (request['action'] == "updateInputType") {
             updateInputType(request['data'])
@@ -196,18 +204,68 @@ chrome.runtime.onConnect.addListener(function (messenger) {
     console.log(something['cpk_memory']);
 });
 
+var onReceiveCallback = function (info) {
+    if (info.connectionId == something.inputSerialPort.connectionId && info.data) {
+        var str = convertArrayBufferToString(info.data);
+        if (str.charAt(str.length - 1) === '\n') {
+            something.serialInputStr += str.substring(0, str.length - 1);
+            onLineReceived(something.serialInputStr);
+            something.serialInputStr = '';
+        } else {
+            something.serialInputStr += str;
+        }
+    }
+};
+
+var onLineReceived = function (line) {
+    $.post(
+        "http://test20.rhinofit.ca/api",
+        {
+            "action": "comportvaliduser",
+            "token": something['cpk_memory']['token'],
+            "barcodeid": line
+        },
+        function (a_response) {
+            if (typeof a_response["error"] !== "undefined") {
+                port.postMessage({ type: "BACKGROUND", callback: "error", msg: a_response["error"] });
+            } else {
+                if (a_response["success"] == 1) {
+                    if (a_response["alerttype"] == 0) {
+                        if (something.outputSerialPort) {
+                            port.postMessage({ type: "BACKGROUND", callback: "success", msg: line });
+                            writeSerial(line);
+                        } else {
+                            port.postMessage({ type: "BACKGROUND", callback: "info", msg: line, title: "Output Not Configured" });
+                        }
+                    } else {
+                        port.postMessage({ type: "BACKGROUND", callback: "warning", msg: "User has no membership or is overdue." });
+                    }
+                } else {
+                    port.postMessage({ type: "BACKGROUND", callback: "error", msg: a_response["msg"] });
+                }
+            }
+        }
+    ).fail(function () {
+        port.postMessage({ type: "BACKGROUND", callback: "error", msg: "Barcode ID query failed" });
+    });
+};
+
 function onClear() {
-    something = new ComPortKiosk();
+    //something = new ComPortKiosk(); /* does this when listener reconnect */
     chrome.app.window.create('window.html', function (win) {
         win.onClosed.addListener(function () {
-            if (serialPort != null) {
-                chrome.serial.disconnect(serialPort.connectionId, serialDisconnect);
-            }
-            if (something.inputSerialPort != null) {
-                chrome.serial.disconnect(something.inputSerialPort.connectionId, inputDisconnect);
-            }
-            if (something.outputSerialPort != null) {
-                chrome.serial.disconnect(something.outputSerialPort.connectionId, outputDisconnect);
+            //if (serialPort != null) {
+            //    chrome.serial.disconnect(serialPort.connectionId, serialDisconnect);
+            //}
+            if (something.inputSerialPort != null && something.outputSerialPort != null) {
+                fullDisconnect();
+            } else {
+                if (something.inputSerialPort != null) {
+                    chrome.serial.disconnect(something.inputSerialPort.connectionId, inputClear);
+                }
+                if (something.outputSerialPort != null) {
+                    chrome.serial.disconnect(something.outputSerialPort.connectionId, outputClear);
+                }
             }
         });
     });
@@ -237,6 +295,18 @@ var serialConnect = function (connectionInfo) {
     serialPort = connectionInfo;
     console.log(serialPort);
 };
+
+var fullDisconnect = function () {
+    chrome.serial.disconnect(something.inputSerialPort.connectionId, fullInputClear);
+}
+var fullInputClear = function (result) {
+    chrome.serial.disconnect(something.outputSerialPort.connectionId, outputClear);
+    if (result) {
+        something.inputSerialPort = null;
+    } else {
+        port.postMessage({ type: "BACKGROUND", callback: "error", msg: "Disconnect failed" });
+    }
+}
 
 var inputConnect = function (data, connectionInfo) {
     something.inputSerialPort = connectionInfo;
@@ -276,6 +346,14 @@ var inputDisconnect = function (result) {
         port.postMessage({ type: "BACKGROUND", callback: "error", msg: "Disconnect failed" });
     }
 };
+
+var inputClear = function (result) {
+    if (result) {
+        something.inputSerialPort = null;
+    } else {
+        port.postMessage({ type: "BACKGROUND", callback: "error", msg: "Disconnect failed" });
+    }
+}
 
 var inputDisconnectReconnect = function (data, result) {
     if (result) {
@@ -340,6 +418,14 @@ var outputDisconnect = function (result) {
     }
 };
 
+var outputClear = function (result) {
+    if (result) {
+        something.outputSerialPort = null;
+    } else {
+        port.postMessage({ type: "BACKGROUND", callback: "error", msg: "Disconnect failed" });
+    }
+}
+
 var outputDisconnectReconnect = function (data, result) {
     if (result) {
         something.outputSerialPort = null;
@@ -393,6 +479,10 @@ var convertStringToArrayBuffer = function (str) {
     return buf;
 };
 
+function convertArrayBufferToString(buf) {
+    return String.fromCharCode.apply(null, new Uint8Array(buf));
+}
+
 var onSend = function (e) {
     if (something['cpk_memory']['input']['type'] == "USB") {
         port.postMessage({ type: "BACKGROUND", callback: "focus" });
@@ -401,3 +491,4 @@ var onSend = function (e) {
 };
 
 var something = null;
+chrome.serial.onReceive.addListener(onReceiveCallback);

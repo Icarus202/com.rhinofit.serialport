@@ -46,7 +46,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 && typeof comport['cpk_memory']['output']['RS232'] !== "undefined") {
                 RS232 = comport['cpk_memory']['output']['RS232'];
             }
-            if (!comport.initiated) {
+            if (!comport.initiated) { /* NOT TRIGGERING */
                 $("select[name=showOutput").val(RS232).change();
             } else {
                 var type = "USB";
@@ -121,21 +121,36 @@ document.addEventListener("DOMContentLoaded", function () {
             setTimeout(function () { port.postMessage({ type: "SCRIPTS", action: "fullyInitiated" }); }, 500);
         } else if (request['callback'] == "login") {
             if (request['response']['success']) {
+                post_memory(request['response']['comport']);
                 $("#login-credentials").fadeOut("slow", function () {
                     $("#login-successful").fadeIn("slow", function () {
                         $("#control-panel").fadeIn("slow", function () {
                             $('button[name=logout]').fadeIn("slow");
                             //load associated settings
+                            selectInputType(null);
                             getOutputDevices();
                         });
                     });
                 });
-            } else {
-                toastr.error(request['response']['msg'], null, toastr_tops);
-            }
+            }// else {
+            //    toastr.error(request['response']['msg'], null, toastr_tops);
+            //}
         } else if (request['callback'] == "error") {
-            /* load_memory builds underlying object */
-            toastr.error(request['msg'], null, toastr_tops);
+            var title = null;
+            if (typeof request['title'] !== "undefined") { title = request['title']; }
+            toastr.error(request['msg'], title, toastr_tops);
+        } else if (request['callback'] == "warning") {
+            var title = null;
+            if (typeof request['title'] !== "undefined") { title = request['title']; }
+            toastr.warning(request['msg'], title, toastr_tops);
+        } else if (request['callback'] == "info") {
+            var title = null;
+            if (typeof request['title'] !== "undefined") { title = request['title']; }
+            toastr.info(request['msg'], title, toastr_tops);
+        } else if (request['callback'] == "success") {
+            var title = null;
+            if (typeof request['title'] !== "undefined") { title = request['title']; }
+            toastr.success(request['msg'], title, toastr_tops);
         } else if (request['callback'] == "focus") {
             /* load_memory builds underlying object */
             $('input[name=input-type]').focus();
@@ -168,7 +183,8 @@ document.addEventListener("DOMContentLoaded", function () {
                 },
                 function (a_response) {
                     if (typeof a_response["error"] !== "undefined") {
-                        port.postMessage({ type: "BACKGROUND", callback: "login", response: { "error": 1, "msg": a_response["error"] } });
+                        toastr.error(a_response["error"], null, toastr_tops);
+                        //port.postMessage({ type: "BACKGROUND", callback: "login", response: { "error": 1, "msg": a_response["error"] } });
                     } else {
                         if (a_response["success"] == 1) {
                             if (a_response["alerttype"] == 0) {
@@ -248,13 +264,17 @@ function reload_memory(data) {
     if (comport.outputSerialPort) {
         $("div[name=output-control-box].alert-warning").removeClass("alert-warning").addClass("alert-success");
     }
-    if (todo_list['refreshInput']) {
+    if (todo_list['refreshInput'] && comport.initiated) {
         todo_list['refreshInput'] = false;
-        getInputDevices();
+        if (comport.inputSerialPort) { } else {
+            getInputDevices();
+        }
     }
-    if (todo_list['refreshOutput']) {
+    if (todo_list['refreshOutput'] && comport.initiated) {
         todo_list['refreshOutput'] = false;
-        getOutputDevices();
+        if (comport.outputSerialPort) { } else {
+            getOutputDevices();
+        }
     }
 }
 
