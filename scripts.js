@@ -1,4 +1,14 @@
-// JavaScript source code
+/*
+ * RhinoFit ComPort Communicator
+ * Copyright (c) 2017 Rhino Software
+ *
+ * Welcome - This project operates with permissions from the underlying RhinoFit platform and its API
+ * This forward facing script mirrors the background scripts operating object (comport) and loads its saved state from
+ * Google Chrome's storage API. The majority of the function calls simply forward information to the backend for processing,
+ * and then the backend sends completion messages to the front end. Most calls occur. The most nuanced aspect of the code
+ * is the loading of existing credentials and connected devices on reset - which is done with an initation flag and completion events
+ * Decyphering how this occurs is not suggested, but if it becomes necessary - Good Luck.
+ */
 var port = null;
 var fixed_size = [600, 500];
 var comport = null;
@@ -15,8 +25,6 @@ document.addEventListener("DOMContentLoaded", function () {
     $("select[name=showOutput]").on("change", connectOutputTrigger);
 
     port = chrome.runtime.connect({ name: "content-background" });
-
-    //also disconnect listeners...
 
     port.onMessage.addListener(function (request, sender) {
         console.log(JSON.stringify(request));
@@ -132,9 +140,7 @@ document.addEventListener("DOMContentLoaded", function () {
                         });
                     });
                 });
-            }// else {
-            //    toastr.error(request['response']['msg'], null, toastr_tops);
-            //}
+            }
         } else if (request['callback'] == "error") {
             var title = null;
             if (typeof request['title'] !== "undefined") { title = request['title']; }
@@ -152,21 +158,10 @@ document.addEventListener("DOMContentLoaded", function () {
             if (typeof request['title'] !== "undefined") { title = request['title']; }
             toastr.success(request['msg'], title, toastr_tops);
         } else if (request['callback'] == "focus") {
-            /* load_memory builds underlying object */
             $('input[name=input-type]').focus();
         } else if (request['callback'] == "post_memory") {
-            /* load_memory builds underlying object */
             post_memory(request['response']);
-        }//else if (request['callback'] == "connecterror") {
-         //  if (request['target'] == "input") {
-         //      $("div[name=output-control-box].alert-warning").removeClass("alert-warning").addClass("alert-success");
-         //  } else if (request['target'] == "output") {
-         //      $("div[name=output-control-box].alert-warning").removeClass("alert-warning").addClass("alert-success");
-         //  }
-         //  toastr.error(request['msg'], null, toastr_tops);
-        //} else {
-        //
-        //}
+        }
     });
 
     $(window).scannerDetection();//{ ignoreIfFocusOn: "input[name='username']" });
@@ -175,7 +170,7 @@ document.addEventListener("DOMContentLoaded", function () {
            && typeof comport['cpk_memory']['input']['type'] !== "undefined"
            && comport['cpk_memory']['input']['type'] == "USB") {
             $.post(
-                "http://test20.rhinofit.ca/api",
+                "http://my.rhinofit.ca/api",
                 {
                     "action": "comportvaliduser",
                     "token": comport['cpk_memory']['token'],
@@ -184,7 +179,6 @@ document.addEventListener("DOMContentLoaded", function () {
                 function (a_response) {
                     if (typeof a_response["error"] !== "undefined") {
                         toastr.error(a_response["error"], null, toastr_tops);
-                        //port.postMessage({ type: "BACKGROUND", callback: "login", response: { "error": 1, "msg": a_response["error"] } });
                     } else {
                         if (a_response["success"] == 1) {
                             if (a_response["alerttype"] == 0) {
@@ -217,9 +211,7 @@ document.addEventListener("DOMContentLoaded", function () {
 function load_memory(data) {
     comport = data;
     if (typeof comport['cpk_memory']['token'] === "undefined") {
-        $("#login-credentials").fadeIn("fast", function (data) {
-            //port.postMessage({ type: "SCRIPTS", action: "fullyInitiated", data: true });
-        }).bind(null, comport);
+        $("#login-credentials").fadeIn("fast");
     } else {
         $("#login-successful").fadeIn("fast", function (data) {
             $("#control-panel").fadeIn("fast", function (cp_data) {
@@ -235,7 +227,6 @@ function load_memory(data) {
                         //getInputDevices(); triggered internally on input-type change...
                     } else {
                         $('input[name=input-type]').prop('checked', true).change();
-                        //port.postMessage({ type: "SCRIPTS", action: "connectInputDevice", data: "USB" });
                     }
                 }
                 if (typeof comport['cpk_memory']['output'] !== "undefined" && comport['cpk_memory']['output']) {
@@ -279,29 +270,15 @@ function reload_memory(data) {
 }
 
 function clickHandler(e) {
-    console.log($(this));
-    if ($(this).attr("name") == "test") {
-        port.postMessage({ type: "SCRIPTS", action: "testing_this" });
-    } else if (e.target.innerHTML == "Connect") {
-        serialConnect(); /*updated*/
-    } else if (e.target.innerHTML == "Send") {
-        port.postMessage({ type: "SCRIPTS", action: "sendMessage", data: "whatever" });
-    } else if (e.target.innerHTML == "Disconnect") {
-        serialDisconnect(); /*updated*/
-    } else if ($(this).attr("name") == "InputDevices") {
-        //$("div[name=input-control-box]").removeClass("alert-success").addClass("alert-warning");
+    if ($(this).attr("name") == "InputDevices") {
         getInputDevices();
-        //port.postMessage({ type: "SCRIPTS", action: "getUSBs" }); 
     } else if ($(this).attr("name") == "OutputDevices") {
         getOutputDevices();
-    } else if (e.target.innerHTML == "ConnectUSB") {
-        var divice = document.getElementsByName('showUSBs')[0].value;
-        port.postMessage({ type: "SCRIPTS", action: "connectUSB", data: divice });
     } else if ($(this).attr("name") == "devices") {
         port.postMessage({ type: "SCRIPTS", action: "getDevices" });
     } else if ($(this).attr("name") == "login") {
         $.post(
-            "http://test20.rhinofit.ca/api",
+            "http://my.rhinofit.ca/api",
             {
                 "action": "login",
                 "email": $('#login-credentials input[name=username]').val(),
@@ -321,7 +298,6 @@ function clickHandler(e) {
         port.postMessage({ type: "SCRIPTS", action: "logout" });
         window.close();
     }
-    //console.log(this); console.log(e);
     return false;
 }
 
@@ -348,7 +324,6 @@ var selectInputType = function (memory_load) {
     } else {
         port.postMessage({ type: "SCRIPTS", action: "updateInputType", data: "RS232" });
         $("#input-rs232:hidden").fadeIn("slow", function () {
-            //$("div[name=input-control-box]").removeClass("alert-success").addClass("alert-warning");
             getInputDevices();
         });
     }
@@ -376,10 +351,6 @@ var connectOutputTrigger = function (e) {
     $("div[name=output-control-box].alert-success").removeClass("alert-success").addClass("alert-warning");
     port.postMessage({ type: "SCRIPTS", action: "connectOutputDevice", data: $(this).val() });
     var type = "USB";
-    //if (typeof comport['cpk_memory']['input'] !== "undefined"
-    //    && typeof comport['cpk_memory']['input']['type'] !== "undefined") {
-    //    type = comport['cpk_memory']['input']['type'];
-    //}
     if ($("input[name=input-type]").is(":checked")) {
         type = "USB";
     } else {
