@@ -2,7 +2,8 @@
   "manifest_version": 2,
   "name": "RhinoFit ComPort Communicator",
   "description": "Send open command to turnstile or door",
-  "version": "1.1",
+  "short_name": "ComPort Kiosk",
+  "version": "1.2",
   "icons": {
     "16": "rhino-16.png",
     "128": "rhino-128.png"

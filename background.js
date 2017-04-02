@@ -185,7 +185,7 @@ var onReceiveCallback = function (info) {
 
 var onLineReceived = function (line) {
     $.post(
-        "http://my.rhinofit.ca/api",
+        "https://my.rhinofit.ca/api",
         {
             "action": "comportvaliduser",
             "token": something['cpk_memory']['token'],

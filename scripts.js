@@ -170,7 +170,7 @@ document.addEventListener("DOMContentLoaded", function () {
            && typeof comport['cpk_memory']['input']['type'] !== "undefined"
            && comport['cpk_memory']['input']['type'] == "USB") {
             $.post(
-                "http://my.rhinofit.ca/api",
+                "https://my.rhinofit.ca/api",
                 {
                     "action": "comportvaliduser",
                     "token": comport['cpk_memory']['token'],
@@ -278,7 +278,7 @@ function clickHandler(e) {
         port.postMessage({ type: "SCRIPTS", action: "getDevices" });
     } else if ($(this).attr("name") == "login") {
         $.post(
-            "http://my.rhinofit.ca/api",
+            "https://my.rhinofit.ca/api",
             {
                 "action": "login",
                 "email": $('#login-credentials input[name=username]').val(),
