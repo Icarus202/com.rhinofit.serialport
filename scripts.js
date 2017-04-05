@@ -23,6 +23,11 @@ document.addEventListener("DOMContentLoaded", function () {
     $("input[name=input-type]").on("change", selectInputType);
     $("select[name=showInput]").on("change", connectInputTrigger);
     $("select[name=showOutput]").on("change", connectOutputTrigger);
+    $(window).on("keypress", function (e) {
+        if (e.keyCode == 13) {
+            $("button[name=login]:visible").trigger("click");
+        }
+    });
 
     port = chrome.runtime.connect({ name: "content-background" });
 
@@ -211,7 +216,9 @@ document.addEventListener("DOMContentLoaded", function () {
 function load_memory(data) {
     comport = data;
     if (typeof comport['cpk_memory']['token'] === "undefined") {
-        $("#login-credentials").fadeIn("fast");
+        $("#login-credentials").fadeIn("fast", function () {
+            $("input").first().focus();
+        });
     } else {
         $("#login-successful").fadeIn("fast", function (data) {
             $("#control-panel").fadeIn("fast", function (cp_data) {
